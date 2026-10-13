@@ -27,8 +27,8 @@ public final class PickerPainter
 	private static final Color SCROLLBAR_HOVER = new Color(160, 148, 120);
 	private static final Color SCROLLBAR_TRACK = new Color(0, 0, 0, 70);
 
-	private static final int ICON_WIDTH = 18;
-	private static final int ICON_HEIGHT = 16;
+	static final int ICON_WIDTH = 18;
+	static final int ICON_HEIGHT = 16;
 	private static final int STAR_SIZE = 7;
 	private static final int CLOCK_SIZE = 9;
 	private static final int SOURCE_SIZE = 9;
@@ -59,6 +59,7 @@ public final class PickerPainter
 	/**
 	 * @param mouse  mouse position on the canvas, or null
 	 * @param icons  item id to image, or null to draw no icons. May return null for an image that isn't ready.
+	 *               Images of the icon size are drawn pixel for pixel; others are stretched to it.
 	 * @param status message for the empty list when there are no setups at all
 	 */
 	public void paint(Graphics2D g, PickerLayout layout, PickerModel.View view, Point mouse,

@@ -47,16 +47,38 @@ public class PickerPreviewTest
 		return setups;
 	}
 
-	// stand-in for item sprites
+	// stand-in for item sprites, with the outline the game draws round them, halved as the overlay halves them
 	private static final IntFunction<BufferedImage> ICONS = id ->
 	{
 		final BufferedImage image = new BufferedImage(36, 32, BufferedImage.TYPE_INT_ARGB);
 		final Graphics2D g = image.createGraphics();
+		g.setColor(new Color(0x000001));
+		g.fillOval(5, 3, 26, 26);
 		g.setColor(Color.getHSBColor(id * 0.13f, 0.6f, 0.9f));
 		g.fillOval(6, 4, 24, 24);
 		g.dispose();
-		return image;
+		return SetupIcons.halve(image);
 	};
+
+	@Test
+	public void iconsKeepTheItemsColorsAndGetTheirOutlineBack()
+	{
+		// the outline and a thin red line in one block, as along a staff, and nothing of the item in the next
+		final BufferedImage sprite = new BufferedImage(6, 4, BufferedImage.TYPE_INT_ARGB);
+		sprite.setRGB(0, 0, 0xff000001);
+		sprite.setRGB(1, 0, 0xff808080);
+		sprite.setRGB(0, 1, 0xffcc2020);
+		final BufferedImage icon = SetupIcons.halve(sprite);
+		assertEquals(3, icon.getWidth());
+		assertEquals(2, icon.getHeight());
+		// a pixel of the sprite's own, the most colorful of its block, not a blend
+		assertEquals(0xffcc2020, icon.getRGB(0, 0));
+		// outlined round it at the small size, with the shadow down and to the right
+		assertEquals(0xff000001, icon.getRGB(1, 0));
+		assertEquals(0xff000001, icon.getRGB(0, 1));
+		assertEquals(0xff302020, icon.getRGB(1, 1));
+		assertEquals(0, icon.getRGB(2, 0));
+	}
 
 	@Test
 	public void renderPreview() throws Exception

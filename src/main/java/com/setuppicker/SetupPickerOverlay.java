@@ -27,7 +27,7 @@ public class SetupPickerOverlay extends Overlay
 	private final Client client;
 	private final SetupPickerConfig config;
 	private final PickerModel model;
-	private final ItemManager itemManager;
+	private final SetupIcons icons;
 
 	// Layout of the last rendered frame, read by the input listeners. Null while the picker isn't showing.
 	private volatile PickerLayout layout;
@@ -45,7 +45,7 @@ public class SetupPickerOverlay extends Overlay
 		this.client = client;
 		this.config = config;
 		this.model = model;
-		this.itemManager = itemManager;
+		this.icons = new SetupIcons(itemManager);
 		// Positions itself, in canvas coordinates
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
@@ -173,7 +173,7 @@ public class SetupPickerOverlay extends Overlay
 		final PickerModel.View clamped = model.view();
 		painter.paint(graphics, newLayout, clamped,
 			hover,
-			config.showIcons() ? itemManager::getImage : null,
+			config.showIcons() ? icons::get : null,
 			FontManager.getRunescapeSmallFont(), status);
 		painter.paintNotes(graphics, newLayout, clamped, hover, FontManager.getRunescapeSmallFont(),
 			new Rectangle(client.getCanvasWidth(), client.getCanvasHeight()), notesOnLeft);
