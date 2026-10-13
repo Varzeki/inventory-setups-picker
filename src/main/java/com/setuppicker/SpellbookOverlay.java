@@ -101,6 +101,7 @@ public class SpellbookOverlay extends Overlay
 			return null;
 		}
 
+		PickerPainter.prepare(graphics);
 		graphics.setFont(FontManager.getRunescapeSmallFont());
 		final FontMetrics fm = graphics.getFontMetrics();
 		final Rectangle bounds = bank.getBounds();

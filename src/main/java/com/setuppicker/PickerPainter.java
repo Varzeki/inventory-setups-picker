@@ -7,6 +7,7 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Polygon;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ public final class PickerPainter
 	private static final Color SCROLLBAR = new Color(120, 110, 90);
 	private static final Color SCROLLBAR_HOVER = new Color(160, 148, 120);
 	private static final Color SCROLLBAR_TRACK = new Color(0, 0, 0, 70);
+	private static final Color SHADOW = Color.BLACK;
 
 	static final int ICON_WIDTH = 18;
 	static final int ICON_HEIGHT = 16;
@@ -65,6 +67,7 @@ public final class PickerPainter
 	public void paint(Graphics2D g, PickerLayout layout, PickerModel.View view, Point mouse,
 		IntFunction<BufferedImage> icons, Font font, String status)
 	{
+		prepare(g);
 		g.setFont(font);
 		final FontMetrics fm = g.getFontMetrics();
 
@@ -84,9 +87,8 @@ public final class PickerPainter
 			final SetupEntry selected = view.getSelected() < view.getRows().size() ? view.getRows().get(view.getSelected()).getSetup() : null;
 			// picking the bank tag that's already open leaves it open, as clicking its tab does
 			final boolean closes = selected != null && !selected.isBankTag() && view.isActive(selected);
-			g.setColor(theme.getMutedText());
-			g.drawString(truncate(fm, "Up/Down: move   Enter: " + (closes ? "close" : "open") + "   Esc: cancel",
-				layout.getFooter().width - 8), layout.getFooter().x + 4, baseline(fm, layout.getFooter()));
+			text(g, truncate(fm, "Up/Down: move   Enter: " + (closes ? "close" : "open") + "   Esc: cancel",
+				layout.getFooter().width - 8), layout.getFooter().x + 4, baseline(fm, layout.getFooter()), theme.getMutedText());
 		}
 
 		g.setColor(theme.getBorder());
@@ -116,7 +118,7 @@ public final class PickerPainter
 		}
 		if (layout.isPalette())
 		{
-			g.drawString(counted, header.x + 7, baseline(fm, header));
+			text(g, counted, header.x + 7, baseline(fm, header), theme.getAccent());
 			return;
 		}
 		// a grip, for the list beside the bank being something that can be dragged by its title bar
@@ -125,8 +127,7 @@ public final class PickerPainter
 		{
 			g.fillRect(header.x + 5 + 4 * (dot % 2), header.y + header.height / 2 - 5 + 4 * (dot / 2), 2, 2);
 		}
-		g.setColor(theme.getAccent());
-		g.drawString(counted, header.x + 16, baseline(fm, header));
+		text(g, counted, header.x + 16, baseline(fm, header), theme.getAccent());
 
 		// collapse arrow: points down when open, right when collapsed
 		final int cx = header.x + header.width - 11;
@@ -166,7 +167,8 @@ public final class PickerPainter
 		final int bottom = tab.y + tab.height;
 		g.rotate(-Math.PI / 2, tab.x, bottom);
 		final int across = (tab.width - fm.getAscent() - fm.getDescent()) / 2 + fm.getAscent();
-		g.drawString(truncate(fm, title, tab.height - arrowSpace - 12), tab.x + 7, bottom + across);
+		// the shadow still falls down and to the right on screen, which here is back along x and across y
+		text(g, truncate(fm, title, tab.height - arrowSpace - 12), tab.x + 7, bottom + across, g.getColor(), -1, 1);
 		g.setTransform(upright);
 	}
 
@@ -181,8 +183,7 @@ public final class PickerPainter
 		final int maxWidth = search.width - 10;
 		if (view.getQuery().isEmpty() && !view.isSearchFocused())
 		{
-			g.setColor(theme.getMutedText());
-			g.drawString("Search...", textX, baseline(fm, search));
+			text(g, "Search...", textX, baseline(fm, search), theme.getMutedText());
 			return;
 		}
 
@@ -206,12 +207,14 @@ public final class PickerPainter
 			g.setColor(theme.getActiveRow());
 			g.fillRect(textX - 1, search.y + 3, fm.stringWidth(shown) + 2, search.height - 6);
 		}
-		g.setColor(theme.getText());
-		g.drawString(shown, textX, baseline(fm, search));
+		text(g, shown, textX, baseline(fm, search), theme.getText());
 
 		if (view.isSearchFocused() && System.currentTimeMillis() / 500 % 2 == 0)
 		{
 			final int caretX = textX + fm.stringWidth(query.substring(start, caret)) + (caret == start ? 0 : 1);
+			g.setColor(SHADOW);
+			g.drawLine(caretX + 1, search.y + 5, caretX + 1, search.y + search.height - 4);
+			g.setColor(theme.getText());
 			g.drawLine(caretX, search.y + 4, caretX, search.y + search.height - 5);
 		}
 	}
@@ -225,8 +228,7 @@ public final class PickerPainter
 		if (rows.isEmpty())
 		{
 			final String message = view.getTotal() > 0 ? "No matches" : status;
-			g.setColor(theme.getMutedText());
-			g.drawString(truncate(fm, message, list.width - 8), list.x + 4, baseline(fm, list));
+			text(g, truncate(fm, message, list.width - 8), list.x + 4, baseline(fm, list), theme.getMutedText());
 			return;
 		}
 
@@ -302,8 +304,8 @@ public final class PickerPainter
 				paintNote(g, textRight + 3, row.y + (row.height - NOTE_HEIGHT) / 2);
 			}
 
-			g.setColor(setup.getDisplayColor() != null ? setup.getDisplayColor() : (active ? theme.getAccent() : theme.getText()));
-			g.drawString(truncate(fm, setup.getName(), textRight - textX), textX, baseline(fm, row));
+			final Color color = setup.getDisplayColor() != null ? setup.getDisplayColor() : (active ? theme.getAccent() : theme.getText());
+			text(g, truncate(fm, setup.getName(), textRight - textX), textX, baseline(fm, row), color);
 		}
 
 		if (scrollbar != null)
@@ -354,7 +356,7 @@ public final class PickerPainter
 		}
 
 		final String name = truncate(fm, header.getSectionName(), right - textX);
-		g.drawString(name, textX, baseline(fm, row));
+		text(g, name, textX, baseline(fm, row), color);
 
 		// rule filling the rest of the row
 		final int ruleX = textX + fm.stringWidth(name) + 5;
@@ -414,6 +416,7 @@ public final class PickerPainter
 			return;
 		}
 
+		prepare(g);
 		g.setFont(font);
 		final FontMetrics fm = g.getFontMetrics();
 		final Rectangle bounds = layout.getBounds();
@@ -439,11 +442,10 @@ public final class PickerPainter
 		g.setColor(BORDER_OUTER);
 		g.drawRect(box.x, box.y, box.width - 1, box.height - 1);
 
-		g.setColor(theme.getText());
 		int baseline = box.y + NOTES_PADDING + fm.getAscent();
 		for (String line : lines)
 		{
-			g.drawString(line, box.x + NOTES_PADDING, baseline);
+			text(g, line, box.x + NOTES_PADDING, baseline, theme.getText());
 			baseline += fm.getHeight();
 		}
 	}
@@ -563,6 +565,35 @@ public final class PickerPainter
 		}
 		g.setColor(FAVORITE);
 		g.fill(star);
+	}
+
+	/**
+	 * Sets the graphics up to draw as the game draws its interfaces. Overlays are given antialiasing, which blurs
+	 * the RuneScape fonts' pixels at their edges, and the game draws them without. The overlay renderer puts the
+	 * hints back after each overlay, so this goes no further than the picker.
+	 */
+	static void prepare(Graphics2D g)
+	{
+		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+	}
+
+	/**
+	 * Draws text as the game draws it on its interfaces: over a black copy of itself a pixel down and to the right.
+	 */
+	private static void text(Graphics2D g, String text, int x, int y, Color color)
+	{
+		text(g, text, x, y, color, 1, 1);
+	}
+
+	/**
+	 * @param shadowX where the shadow goes from the text, in the graphics' own coordinates
+	 */
+	private static void text(Graphics2D g, String text, int x, int y, Color color, int shadowX, int shadowY)
+	{
+		g.setColor(SHADOW);
+		g.drawString(text, x + shadowX, y + shadowY);
+		g.setColor(color);
+		g.drawString(text, x, y);
 	}
 
 	private static int baseline(FontMetrics fm, Rectangle box)
