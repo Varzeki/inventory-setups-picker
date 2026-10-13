@@ -5,7 +5,6 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Point;
-import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
@@ -40,6 +39,77 @@ public final class PickerPainter
 	private static final int NOTES_MAX_LINES = 8;
 	private static final int NOTES_WIDTH = 190;
 	private static final int SECTION_ARROW_WIDTH = 5;
+	// lines of pixels from an arrowhead's flat side to its point
+	private static final int ARROW_DEPTH = 5;
+
+	// The marks on rows, a # for each pixel
+	private static final String[] STAR = {
+		"...#...",
+		"..###..",
+		"#######",
+		".#####.",
+		"..###..",
+		".##.##.",
+		".#...#.",
+	};
+	private static final String[] CLOCK = {
+		"...###...",
+		".##...##.",
+		".#..#..#.",
+		"#...#...#",
+		"#...###.#",
+		"#.......#",
+		".#.....#.",
+		".##...##.",
+		"...###...",
+	};
+	private static final String[] NOTE = {
+		"#######",
+		"#.....#",
+		"#.....#",
+		"#.###.#",
+		"#.....#",
+		"#.###.#",
+		"#.....#",
+		"#.....#",
+		"#######",
+	};
+	// pointing left, with the hole for its string at the point
+	private static final String[] TAG = {
+		".........",
+		"...######",
+		"..#######",
+		".########",
+		"###.#####",
+		".########",
+		"..#######",
+		"...######",
+	};
+	// six dots, for something that can be taken hold of
+	private static final String[] GRIP = {
+		"##..##",
+		"##..##",
+		"......",
+		"......",
+		"##..##",
+		"##..##",
+		"......",
+		"......",
+		"##..##",
+		"##..##",
+	};
+	// head, shoulders and arms, body, legs
+	private static final String[] PERSON = {
+		"...###...",
+		"...###...",
+		"...###...",
+		".#######.",
+		".#.###.#.",
+		".#.###.#.",
+		"...###...",
+		"...#.#...",
+		"...#.#...",
+	};
 
 	private final PickerTheme theme;
 	private final String title;
@@ -122,30 +192,20 @@ public final class PickerPainter
 			return;
 		}
 		// a grip, for the list beside the bank being something that can be dragged by its title bar
-		g.setColor(hovered ? theme.getAccent() : theme.getMutedText());
-		for (int dot = 0; dot < 6; dot++)
-		{
-			g.fillRect(header.x + 5 + 4 * (dot % 2), header.y + header.height / 2 - 5 + 4 * (dot / 2), 2, 2);
-		}
+		mark(g, GRIP, header.x + 5, header.y + header.height / 2 - 5, hovered ? theme.getAccent() : theme.getMutedText());
 		text(g, counted, header.x + 16, baseline(fm, header), theme.getAccent());
 
 		// collapse arrow: points down when open, right when collapsed
 		final int cx = header.x + header.width - 11;
 		final int cy = header.y + header.height / 2;
-		final Polygon arrow = new Polygon();
 		if (layout.isCollapsed())
 		{
-			arrow.addPoint(cx - 2, cy - 4);
-			arrow.addPoint(cx + 3, cy);
-			arrow.addPoint(cx - 2, cy + 4);
+			arrowhead(g, cx - 2, cy, 1, 0, theme.getAccent());
 		}
 		else
 		{
-			arrow.addPoint(cx - 4, cy - 2);
-			arrow.addPoint(cx + 4, cy - 2);
-			arrow.addPoint(cx, cy + 3);
+			arrowhead(g, cx, cy - 2, 0, 1, theme.getAccent());
 		}
-		g.fill(arrow);
 	}
 
 	/**
@@ -156,11 +216,7 @@ public final class PickerPainter
 		final int arrowSpace = 16;
 		final int cx = tab.x + tab.width / 2;
 		final int cy = tab.y + arrowSpace / 2 + 2;
-		final Polygon arrow = new Polygon();
-		arrow.addPoint(cx - 2, cy - 4);
-		arrow.addPoint(cx + 3, cy);
-		arrow.addPoint(cx - 2, cy + 4);
-		g.fill(arrow);
+		arrowhead(g, cx - 2, cy, 1, 0, theme.getAccent());
 
 		// Turned a quarter turn about the tab's bottom left corner, x runs up the tab and y across it
 		final AffineTransform upright = g.getTransform();
@@ -168,7 +224,7 @@ public final class PickerPainter
 		g.rotate(-Math.PI / 2, tab.x, bottom);
 		final int across = (tab.width - fm.getAscent() - fm.getDescent()) / 2 + fm.getAscent();
 		// the shadow still falls down and to the right on screen, which here is back along x and across y
-		text(g, truncate(fm, title, tab.height - arrowSpace - 12), tab.x + 7, bottom + across, g.getColor(), -1, 1);
+		text(g, truncate(fm, title, tab.height - arrowSpace - 12), tab.x + 7, bottom + across, theme.getAccent(), -1, 1);
 		g.setTransform(upright);
 	}
 
@@ -345,13 +401,13 @@ public final class PickerPainter
 		g.setColor(color);
 		if (header.isBack())
 		{
-			paintArrow(g, textX, cy, -1);
+			paintArrow(g, textX, cy, -1, color);
 			textX += SECTION_ARROW_WIDTH + 4;
 		}
 		else if (pickable)
 		{
 			right -= SECTION_ARROW_WIDTH;
-			paintArrow(g, right, cy, 1);
+			paintArrow(g, right, cy, 1, color);
 			right -= 4;
 		}
 
@@ -368,16 +424,41 @@ public final class PickerPainter
 	}
 
 	/**
-	 * A small arrowhead with its flat side at x, pointing right for a direction of 1 and left for -1.
+	 * A small arrowhead filling the section arrow's width from x, pointing right for a direction of 1 and left for -1.
 	 */
-	private void paintArrow(Graphics2D g, int x, int cy, int direction)
+	private void paintArrow(Graphics2D g, int x, int cy, int direction, Color color)
 	{
-		final int base = direction > 0 ? x : x + SECTION_ARROW_WIDTH;
-		final Polygon arrow = new Polygon();
-		arrow.addPoint(base, cy - 4);
-		arrow.addPoint(base + direction * SECTION_ARROW_WIDTH, cy);
-		arrow.addPoint(base, cy + 4);
-		g.fill(arrow);
+		arrowhead(g, direction > 0 ? x : x + SECTION_ARROW_WIDTH - 1, cy, direction, 0, color);
+	}
+
+	/**
+	 * An arrowhead, made of lines of 9, 7, 5, 3 and 1 pixels from its flat side to its point, which drawn pixel by
+	 * pixel comes out even on both sides at this size, as a filled triangle doesn't.
+	 *
+	 * @param x  the middle of its flat side
+	 * @param dx the way it points across: 1 for right, -1 for left, or 0 when it points up or down
+	 * @param dy the way it points down: 1 for down, -1 for up, or 0 when it points left or right
+	 */
+	private static void arrowhead(Graphics2D g, int x, int y, int dx, int dy, Color color)
+	{
+		for (int pass = 0; pass < 2; pass++)
+		{
+			// shadow first, as for text
+			final int offset = pass == 0 ? 1 : 0;
+			g.setColor(pass == 0 ? SHADOW : color);
+			for (int step = 0; step < ARROW_DEPTH; step++)
+			{
+				final int half = ARROW_DEPTH - 1 - step;
+				if (dx != 0)
+				{
+					g.fillRect(x + dx * step + offset, y - half + offset, 1, 2 * half + 1);
+				}
+				else
+				{
+					g.fillRect(x - half + offset, y + dy * step + offset, 2 * half + 1, 1);
+				}
+			}
+		}
 	}
 
 	/**
@@ -385,10 +466,34 @@ public final class PickerPainter
 	 */
 	private void paintNote(Graphics2D g, int x, int y)
 	{
-		g.setColor(theme.getMutedText());
-		g.drawRect(x, y, NOTE_WIDTH - 1, NOTE_HEIGHT - 1);
-		g.drawLine(x + 2, y + 3, x + NOTE_WIDTH - 3, y + 3);
-		g.drawLine(x + 2, y + 5, x + NOTE_WIDTH - 3, y + 5);
+		mark(g, NOTE, x, y, theme.getMutedText());
+	}
+
+	/**
+	 * Draws one of the little pictures that mark rows, pixel by pixel so that it is as crisp as the text beside it,
+	 * and with the same shadow.
+	 *
+	 * @param picture rows of the picture, with a # for each pixel to draw
+	 * @param x       left of the picture
+	 * @param y       top of the picture
+	 */
+	private static void mark(Graphics2D g, String[] picture, int x, int y, Color color)
+	{
+		for (int pass = 0; pass < 2; pass++)
+		{
+			final int offset = pass == 0 ? 1 : 0;
+			g.setColor(pass == 0 ? SHADOW : color);
+			for (int row = 0; row < picture.length; row++)
+			{
+				for (int column = 0; column < picture[row].length(); column++)
+				{
+					if (picture[row].charAt(column) == '#')
+					{
+						g.fillRect(x + column + offset, y + row + offset, 1, 1);
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -511,11 +616,7 @@ public final class PickerPainter
 	 */
 	private void paintClock(Graphics2D g, int cx, int cy)
 	{
-		final int radius = CLOCK_SIZE / 2;
-		g.setColor(theme.getMutedText());
-		g.drawOval(cx - radius, cy - radius, CLOCK_SIZE - 1, CLOCK_SIZE - 1);
-		g.drawLine(cx, cy, cx, cy - radius + 2);
-		g.drawLine(cx, cy, cx + radius - 2, cy);
+		mark(g, CLOCK, cx - CLOCK_SIZE / 2, cy - CLOCK_SIZE / 2, theme.getMutedText());
 	}
 
 	/**
@@ -527,54 +628,23 @@ public final class PickerPainter
 	 */
 	private void paintSource(Graphics2D g, int x, int y, boolean bankTag)
 	{
-		g.setColor(theme.getMutedText());
-		if (bankTag)
-		{
-			// pointing left, with the hole for its string at the point
-			final int mid = y + SOURCE_SIZE / 2;
-			final Polygon tag = new Polygon();
-			tag.addPoint(x, mid);
-			tag.addPoint(x + 3, y + 1);
-			tag.addPoint(x + SOURCE_SIZE - 1, y + 1);
-			tag.addPoint(x + SOURCE_SIZE - 1, y + SOURCE_SIZE - 2);
-			tag.addPoint(x + 3, y + SOURCE_SIZE - 2);
-			g.fill(tag);
-			g.draw(tag);
-			g.setColor(theme.getBackground());
-			g.fillRect(x + 3, mid, 1, 1);
-			return;
-		}
-		// head, shoulders and arms, body, legs
-		g.fillRect(x + 3, y, 3, 3);
-		g.fillRect(x + 1, y + 3, 7, 1);
-		g.fillRect(x + 1, y + 4, 1, 2);
-		g.fillRect(x + 7, y + 4, 1, 2);
-		g.fillRect(x + 3, y + 4, 3, 3);
-		g.fillRect(x + 3, y + 7, 1, 2);
-		g.fillRect(x + 5, y + 7, 1, 2);
+		mark(g, bankTag ? TAG : PERSON, x, y, theme.getMutedText());
 	}
 
 	private void paintStar(Graphics2D g, int cx, int cy)
 	{
-		final Polygon star = new Polygon();
-		for (int i = 0; i < 10; i++)
-		{
-			final double radius = i % 2 == 0 ? STAR_SIZE / 2.0 + 0.5 : STAR_SIZE / 4.0;
-			final double angle = -Math.PI / 2 + i * Math.PI / 5;
-			star.addPoint((int) Math.round(cx + radius * Math.cos(angle)), (int) Math.round(cy + radius * Math.sin(angle)));
-		}
-		g.setColor(FAVORITE);
-		g.fill(star);
+		mark(g, STAR, cx - STAR_SIZE / 2, cy - STAR_SIZE / 2, FAVORITE);
 	}
 
 	/**
 	 * Sets the graphics up to draw as the game draws its interfaces. Overlays are given antialiasing, which blurs
-	 * the RuneScape fonts' pixels at their edges, and the game draws them without. The overlay renderer puts the
-	 * hints back after each overlay, so this goes no further than the picker.
+	 * the RuneScape fonts' pixels at their edges and softens small shapes, and the game draws both without. The
+	 * overlay renderer puts the hints back after each overlay, so this goes no further than the picker.
 	 */
 	static void prepare(Graphics2D g)
 	{
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 	}
 
 	/**
