@@ -113,6 +113,14 @@ The **Colors** section of the settings changes the background, title bar, border
 lists, each with a color picker that takes a hex code, for matching a resource pack. To put one back, right-click
 its name in the settings and choose "Reset".
 
+To match a resource pack exactly, turn on **Match resource pack** at the top of that section. Both lists and the
+box of notes are then drawn with the game's own interface sprites, the same ones the bank is drawn with: its steel
+frame and background, the stone outline of the game's input boxes, and the game's scrollbar, whose arrows scroll a
+row. Whatever the [Resource Packs](https://runelite.net/plugin-hub/show/resource-packs) plugin or RuneLite's
+Interface Styles do to the bank, they do to the lists too, including a pack changed while you play. The background,
+title bar and border colors aren't used then; the accent and text colors still are. The frame goes round the
+list, so the list is that much wider than its **Width** setting and has the same room inside.
+
 ## Settings
 
 | Setting | Default | What it does |
@@ -136,6 +144,7 @@ its name in the settings and choose "Reset".
 | Max rows | 0 | The most rows the list beside the bank shows before it scrolls. 0 lets it run as far down as the bank does, or as the client does once it has been dragged elsewhere. |
 | Show spellbook | Off | Say under the bank's bottom right corner which spellbook the open setup is for, in red when you're on another. |
 | Vertical when collapsed | Off | Collapse the list beside the bank to an upright tab instead of its title bar. A list that has been dragged elsewhere always collapses to its title bar. |
+| Match resource pack | Off | Draw the lists with the game's own interface sprites, so they follow your resource pack or interface style. |
 | Colors | | Background, title bar, border, accent and text colors. |
 
 ## Update messages
@@ -156,4 +165,5 @@ Bank Tag tabs and their layouts. Thanks to Ian-Fund for that work.
 ## Development
 
 `./gradlew runClient` starts RuneLite with the plugin loaded. `./gradlew test` also writes a rendering of both
-views to `build/preview.png`, and of setups and bank tags listed together to `build/preview-mixed.png`.
+views to `build/preview.png`, of setups and bank tags listed together to `build/preview-mixed.png`, and of the list
+drawn with stand-ins for the game's sprites to `build/preview-game.png`.
