@@ -447,6 +447,20 @@ public class PickerPreviewTest
 		// and it is still kept on the canvas
 		assertEquals(0, PickerLayout.computeMoved(bank, canvas, new Point(-215, 40), 160, false, 30, 20, 0, game).getBounds().x);
 
+		// let go against the canvas's edge with the frame on: saved where it was let go, and that place is the same
+		// whether it's next drawn with the frame or without, however often that is turned on and off
+		final Point savedLeft = PickerLayout.keepOnCanvas(bank, canvas, new Point(-260, 40), 160, game);
+		assertEquals(0, PickerLayout.computeMoved(bank, canvas, savedLeft, 160, false, 30, 20, 0, game).getBounds().x);
+		assertEquals(12, PickerLayout.computeMoved(bank, canvas, savedLeft, 160, false, 30, 20, 0).getBounds().x);
+		assertEquals(savedLeft, PickerLayout.keepOnCanvas(bank, canvas, savedLeft, 160, game));
+		assertEquals(savedLeft, PickerLayout.keepOnCanvas(bank, canvas, savedLeft, 160, PickerLayout.Frame.FLAT));
+		final Point savedRight = PickerLayout.keepOnCanvas(bank, canvas, new Point(WIDTH, 40), 160, game);
+		final Rectangle framedRight = PickerLayout.computeMoved(bank, canvas, savedRight, 160, false, 30, 20, 0, game).getBounds();
+		assertEquals(WIDTH, framedRight.x + framedRight.width);
+		assertEquals(framedRight.x, PickerLayout.computeMoved(bank, canvas, savedRight, 160, false, 30, 20, 0).getBounds().x);
+		assertEquals(savedRight, PickerLayout.keepOnCanvas(bank, canvas, savedRight, 160, game));
+		assertEquals(savedRight, PickerLayout.keepOnCanvas(bank, canvas, savedRight, 160, PickerLayout.Frame.FLAT));
+
 		// beside the bank, the gap stays on either side, expanded, collapsed or as an upright tab
 		for (boolean collapsed : new boolean[]{false, true})
 		{

@@ -20,7 +20,8 @@ public class PickerStyle
 	// Set from any thread when a setting changes, and acted on by the next refresh
 	private volatile boolean stale = true;
 	private PickerTheme theme;
-	private PickerSkin skin;
+	// read by the mouse too, for the room the list's frame takes while it is dragged
+	private volatile PickerSkin skin;
 	// what the skin was made from
 	private int spritesVersion;
 	private Color line;

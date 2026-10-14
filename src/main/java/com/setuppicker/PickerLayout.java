@@ -230,6 +230,21 @@ public final class PickerLayout
 	}
 
 	/**
+	 * The place to save for a dragged list, moved as little as keeps it on the canvas when drawn. Which side of the
+	 * bank it is on, and so which way its frame grows, is kept from the place it was given, so that the place saved
+	 * is drawn where the list was let go, with the frame or without it.
+	 *
+	 * @param offset where the list's top left corner is from the bank's, as drawn without a frame
+	 */
+	public static Point keepOnCanvas(Rectangle bank, Rectangle canvas, Point offset, int width, Frame frame)
+	{
+		final int x = bank.x + offset.x;
+		final int grown = leftOf(bank, x, width) ? 2 * frame.edge : 0;
+		final Point corner = clamp(new Point(x - grown, bank.y + offset.y), width, canvas, frame);
+		return new Point(corner.x + grown - bank.x, corner.y - bank.y);
+	}
+
+	/**
 	 * Whether a list at this place without its frame is to the left of the bank, by their middles.
 	 */
 	private static boolean leftOf(Rectangle bank, int x, int width)

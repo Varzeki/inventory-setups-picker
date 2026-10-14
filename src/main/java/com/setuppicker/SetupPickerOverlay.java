@@ -83,7 +83,7 @@ public class SetupPickerOverlay extends Overlay
 		if (bank != null)
 		{
 			// kept as the place without a frame, which is what is saved
-			dragOffset = PickerLayout.offsetFor(bank, corner, config.width(), frame());
+			dragOffset = PickerLayout.offsetFor(bank, corner, config.width(), style.getFrame());
 		}
 	}
 
@@ -100,18 +100,7 @@ public class SetupPickerOverlay extends Overlay
 		{
 			return null;
 		}
-		final PickerLayout.Frame frame = frame();
-		final Point corner = PickerLayout.movedCorner(bank, area, offset, config.width(), frame);
-		return PickerLayout.offsetFor(bank, corner, config.width(), frame);
-	}
-
-	/**
-	 * What the list was last drawn with.
-	 */
-	private PickerLayout.Frame frame()
-	{
-		final PickerLayout drawn = layout;
-		return drawn != null ? drawn.getFrame() : PickerLayout.Frame.FLAT;
+		return PickerLayout.keepOnCanvas(bank, area, offset, config.width(), style.getFrame());
 	}
 
 	/**
