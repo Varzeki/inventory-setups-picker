@@ -14,6 +14,11 @@ import javax.inject.Singleton;
 @Singleton
 public class PickerStyle
 {
+	// While the game's sprites can't all be had they are tried for again every client tick at first, as they load
+	// at startup, and then only every so often, for one the game may never have
+	private static final long STARTUP_MILLIS = 5000;
+	private static final long RETRY_MILLIS = 2000;
+
 	private final SetupPickerConfig config;
 	private final GameSprites sprites;
 
@@ -25,8 +30,10 @@ public class PickerStyle
 	// what the skin was made from
 	private int spritesVersion;
 	private Color line;
-	// the client tick the game's sprites were last found incomplete in, to try again in the next
+	// the client tick the game's sprites were last found incomplete in, when they were first, and when to try next
 	private int incompleteCycle = -1;
+	private long incompleteSince;
+	private long retryAt;
 
 	@Inject
 	PickerStyle(SetupPickerConfig config, GameSprites sprites)
@@ -47,34 +54,48 @@ public class PickerStyle
 		}
 		final boolean current = !game
 			|| skin != null && spritesVersion == sprites.getVersion() && line.equals(sprites.getLine())
-			|| skin == null && sprites.getCycle() == incompleteCycle;
+			|| skin == null && spritesVersion == sprites.getVersion()
+			&& (sprites.getCycle() == incompleteCycle || System.currentTimeMillis() < retryAt);
 		if (!stale && current)
 		{
 			return;
 		}
 		stale = false;
 
-		skin = null;
+		PickerSkin made = null;
 		if (game)
 		{
 			spritesVersion = sprites.getVersion();
 			line = sprites.getLine();
-			final PickerSkin made = new PickerSkin(sprites);
+			made = new PickerSkin(sprites);
 			if (made.isComplete())
 			{
-				skin = made;
+				incompleteSince = 0;
 			}
 			else
 			{
 				// in colors meanwhile, which only happens while the cache is still loading them, or if it never has them
+				made = null;
 				incompleteCycle = sprites.getCycle();
+				final long now = System.currentTimeMillis();
+				if (incompleteSince == 0)
+				{
+					incompleteSince = now;
+				}
+				retryAt = now - incompleteSince < STARTUP_MILLIS ? 0 : now + RETRY_MILLIS;
 			}
 		}
-		theme = skin == null
+		else
+		{
+			// so that turning it on again starts with quick tries
+			incompleteSince = 0;
+		}
+		skin = made;
+		theme = made == null
 			? new PickerTheme(config.backgroundColor(), config.headerColor(), config.borderColor(), config.accentColor(), config.textColor())
 			// the text colors are still the settings' own, worked out against the game's background, and dividing
 			// lines are the color of the bank's
-			: new PickerTheme(skin.getBackground(), skin.getField(), line, config.accentColor(), config.textColor());
+			: new PickerTheme(made.getBackground(), made.getField(), line, config.accentColor(), config.textColor());
 	}
 
 	public PickerTheme getTheme()
