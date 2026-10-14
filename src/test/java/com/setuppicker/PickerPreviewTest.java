@@ -66,21 +66,40 @@ public class PickerPreviewTest
 	@Test
 	public void iconsKeepTheItemsColorsAndGetTheirOutlineBack()
 	{
-		// the outline and a thin red line in one block, as along a staff, and nothing of the item in the next
-		final BufferedImage sprite = new BufferedImage(6, 4, BufferedImage.TYPE_INT_ARGB);
-		sprite.setRGB(0, 0, 0xff000001);
-		sprite.setRGB(1, 0, 0xff808080);
-		sprite.setRGB(0, 1, 0xffcc2020);
+		final int outline = 0xff000001;
+		final int shadow = 0xff302020;
+		// 8x6, so 4x3 halved, and 6x5 with the margin round it
+		final BufferedImage sprite = new BufferedImage(8, 6, BufferedImage.TYPE_INT_ARGB);
+		// block (0, 0), at the sprite's corner: the outline, the shadow, a dull grey and a red; the red wins
+		sprite.setRGB(0, 0, outline);
+		sprite.setRGB(1, 0, shadow);
+		sprite.setRGB(0, 1, 0xff808080);
+		sprite.setRGB(1, 1, 0xffcc2020);
+		// block (1, 0): only outline and shadow, which never win, so it stays empty but for the outline round the red
+		sprite.setRGB(2, 0, outline);
+		sprite.setRGB(3, 1, shadow);
+		// block (3, 2), at the opposite corner: a single green pixel among nothing
+		sprite.setRGB(7, 5, 0xff20a040);
+
 		final BufferedImage icon = SetupIcons.halve(sprite);
-		assertEquals(3, icon.getWidth());
-		assertEquals(2, icon.getHeight());
-		// a pixel of the sprite's own, the most colorful of its block, not a blend
-		assertEquals(0xffcc2020, icon.getRGB(0, 0));
-		// outlined round it at the small size, with the shadow down and to the right
-		assertEquals(0xff000001, icon.getRGB(1, 0));
-		assertEquals(0xff000001, icon.getRGB(0, 1));
-		assertEquals(0xff302020, icon.getRGB(1, 1));
-		assertEquals(0, icon.getRGB(2, 0));
+		assertEquals(4 + 2, icon.getWidth());
+		assertEquals(3 + 2, icon.getHeight());
+		// each block in the middle, a pixel in from the margin: pixels of the sprite's own, not blends
+		assertEquals(0xffcc2020, icon.getRGB(1, 1));
+		assertEquals(0xff20a040, icon.getRGB(4, 3));
+		// the outline all round each, even at the sprite's edges, which the margin leaves room for
+		for (Point p : Arrays.asList(new Point(0, 1), new Point(1, 0), new Point(2, 1), new Point(1, 2),
+			new Point(3, 3), new Point(5, 3), new Point(4, 2), new Point(4, 4)))
+		{
+			assertEquals(p.toString(), outline, icon.getRGB(p.x, p.y));
+		}
+		// the shadow down and to the right of the item and its outline
+		assertEquals(shadow, icon.getRGB(2, 2));
+		assertEquals(shadow, icon.getRGB(5, 4));
+		// and nothing where there is none of the item near
+		assertEquals(0, icon.getRGB(0, 0));
+		assertEquals(0, icon.getRGB(4, 1));
+		assertEquals(0, icon.getRGB(0, 4));
 	}
 
 	@Test

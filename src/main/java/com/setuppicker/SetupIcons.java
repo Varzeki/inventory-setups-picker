@@ -57,23 +57,26 @@ public class SetupIcons
 	 * Of those it is the item's most vivid one, so that thin coloured parts survive, and only where there is none
 	 * of the item is it left empty. The outline and shadow are then drawn round the result as the game draws them
 	 * round a sprite, a pixel wide at the new size.
+	 * <p>
+	 * The item can reach the sprite's edge once halved, so the result has a pixel's margin all round for its outline
+	 * and shadow: it is two pixels wider and taller than half the sprite, with the halved sprite in the middle.
 	 */
 	static BufferedImage halve(BufferedImage sprite)
 	{
-		final int width = sprite.getWidth() / 2;
-		final int height = sprite.getHeight() / 2;
+		final int width = sprite.getWidth() / 2 + 2;
+		final int height = sprite.getHeight() / 2 + 2;
 		final int[] source = sprite.getRGB(0, 0, sprite.getWidth(), sprite.getHeight(), null, 0, sprite.getWidth());
 		final int[] item = new int[width * height];
-		for (int y = 0; y < height; y++)
+		for (int y = 1; y < height - 1; y++)
 		{
-			for (int x = 0; x < width; x++)
+			for (int x = 1; x < width - 1; x++)
 			{
 				int best = 0;
 				for (int dy = 0; dy < 2; dy++)
 				{
 					for (int dx = 0; dx < 2; dx++)
 					{
-						final int pixel = source[(2 * y + dy) * sprite.getWidth() + 2 * x + dx];
+						final int pixel = source[(2 * (y - 1) + dy) * sprite.getWidth() + 2 * (x - 1) + dx];
 						if (isItem(pixel) && (best == 0 || vividness(pixel) > vividness(best)))
 						{
 							best = pixel;

@@ -142,7 +142,8 @@ public final class PickerPainter
 	/**
 	 * @param mouse  mouse position on the canvas, or null
 	 * @param icons  item id to image, or null to draw no icons. May return null for an image that isn't ready.
-	 *               Images of the icon size are drawn pixel for pixel; others are stretched to it.
+	 *               Images of the icon size, or a pixel larger all round, are drawn pixel for pixel in the middle of
+	 *               its place; larger ones are stretched to it.
 	 * @param status message for the empty list when there are no setups at all
 	 */
 	public void paint(Graphics2D g, PickerLayout layout, PickerModel.View view, Point mouse,
@@ -371,7 +372,17 @@ public final class PickerPainter
 				final BufferedImage icon = icons.apply(setup.getIconItemId());
 				if (icon != null)
 				{
-					g.drawImage(icon, row.x + 2, row.y + (row.height - ICON_HEIGHT) / 2, ICON_WIDTH, ICON_HEIGHT, null);
+					final int iconX = row.x + 2;
+					final int iconY = row.y + (row.height - ICON_HEIGHT) / 2;
+					if (icon.getWidth() <= ICON_WIDTH + 2 && icon.getHeight() <= ICON_HEIGHT + 2)
+					{
+						// with the margin for its outline spilling into the row's padding
+						g.drawImage(icon, iconX + (ICON_WIDTH - icon.getWidth()) / 2, iconY + (ICON_HEIGHT - icon.getHeight()) / 2, null);
+					}
+					else
+					{
+						g.drawImage(icon, iconX, iconY, ICON_WIDTH, ICON_HEIGHT, null);
+					}
 				}
 				textX = row.x + 2 + ICON_WIDTH + 4;
 			}
