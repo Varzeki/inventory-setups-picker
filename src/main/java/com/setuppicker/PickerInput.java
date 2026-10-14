@@ -31,6 +31,9 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 {
 	// How far the mouse has to go with the title bar held for it to be a drag of the list, not a click
 	private static final int DRAG_THRESHOLD = 4;
+	// A held scrollbar arrow keeps scrolling after a moment, then steadily, as the game's do
+	private static final long ARROW_DELAY_MILLIS = 250;
+	private static final long ARROW_REPEAT_MILLIS = 50;
 	private static final int MODIFIER_MASK = InputEvent.CTRL_DOWN_MASK | InputEvent.META_DOWN_MASK
 		| InputEvent.ALT_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK;
 
@@ -53,6 +56,12 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 	private boolean titleCollapsed;
 	// whether it has been moved far enough since to be dragging the list
 	private boolean moving;
+	// While a scrollbar arrow is held: the way it scrolls, when it was pressed and where the mouse is. Else 0.
+	// Set by the mouse and read each client tick.
+	private volatile int arrowHeld;
+	private volatile long arrowPressedAt;
+	private volatile Point arrowMouse;
+	private long arrowRepeatedAt;
 
 	@Inject
 	PickerInput(Client client, SetupPickerPlugin plugin, SetupPickerConfig config, SetupPickerOverlay overlay,
@@ -69,8 +78,9 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 	@Override
 	public MouseEvent mousePressed(MouseEvent e)
 	{
-		// in case the release that ends a drag of the scrollbar never came
+		// in case the release that ends a drag of the scrollbar, or a hold of its arrow, never came
 		scrollGrab = -1;
+		arrowHeld = 0;
 		model.setScrollbarDragged(false);
 		// or the one that ends a drag of the list
 		titlePress = null;
@@ -145,6 +155,29 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 	}
 
 	/**
+	 * Keeps scrolling while a scrollbar arrow is held down with the mouse on it: after a moment, then a row at a
+	 * time, steadily. Client thread, each client tick.
+	 */
+	void tick()
+	{
+		final int direction = arrowHeld;
+		final long now = System.currentTimeMillis();
+		if (direction == 0 || now - arrowPressedAt < ARROW_DELAY_MILLIS || now - arrowRepeatedAt < ARROW_REPEAT_MILLIS)
+		{
+			return;
+		}
+		final PickerLayout layout = overlay.getLayout();
+		final Point mouse = arrowMouse;
+		final int rows = model.view().getRows().size();
+		final Rectangle arrow = layout == null ? null : direction < 0 ? layout.getScrollUp(rows) : layout.getScrollDown(rows);
+		if (arrow != null && mouse != null && arrow.contains(mouse))
+		{
+			arrowRepeatedAt = now;
+			model.scrollBy(direction);
+		}
+	}
+
+	/**
 	 * Take hold of the scrollbar if that's what was pressed. Pressing it above or below its thumb brings the
 	 * thumb there first. Its arrows, when it has them, scroll a row.
 	 */
@@ -161,7 +194,11 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 		final Rectangle down = layout.getScrollDown(rowCount);
 		if (up != null && up.contains(e.getPoint()) || down != null && down.contains(e.getPoint()))
 		{
-			model.scrollBy(up != null && up.contains(e.getPoint()) ? -1 : 1);
+			arrowHeld = up != null && up.contains(e.getPoint()) ? -1 : 1;
+			arrowMouse = e.getPoint();
+			arrowPressedAt = System.currentTimeMillis();
+			arrowRepeatedAt = arrowPressedAt;
+			model.scrollBy(arrowHeld);
 			return true;
 		}
 		final Rectangle thumb = layout.getScrollThumb(rowCount, view.getScroll());
@@ -184,6 +221,12 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 			e.consume();
 			return e;
 		}
+		if (arrowHeld != 0)
+		{
+			arrowMouse = e.getPoint();
+			e.consume();
+			return e;
+		}
 		final PickerLayout layout = overlay.getLayout();
 		if (scrollGrab < 0 || layout == null)
 		{
@@ -198,6 +241,11 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 	@Override
 	public MouseEvent mouseReleased(MouseEvent e)
 	{
+		if (arrowHeld != 0)
+		{
+			arrowHeld = 0;
+			e.consume();
+		}
 		if (scrollGrab >= 0)
 		{
 			scrollGrab = -1;

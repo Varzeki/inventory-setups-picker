@@ -257,6 +257,7 @@ public class SetupPickerPlugin extends Plugin
 	public void onClientTick(ClientTick event)
 	{
 		chatboxKeyGuard.sync(model.view().isSearchFocused());
+		input.tick();
 
 		// Bank Tags has no message for its open tag changing, so keep an eye on it
 		// Under the name it's listed by, as Bank Tags doesn't mind how a tag's name is capitalized. One that isn't
