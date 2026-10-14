@@ -97,6 +97,9 @@ public class SetupPickerPlugin extends Plugin
 	@Inject
 	private SpellbookOverlay spellbookOverlay;
 
+	@Inject
+	private PickerStyle style;
+
 	private final AtomicBoolean refreshQueued = new AtomicBoolean();
 	private final RecentTagTracker recentTagTracker = new RecentTagTracker();
 	// The names of the bank tags listed, by their standardized form. Client thread only.
@@ -190,6 +193,9 @@ public class SetupPickerPlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
+		// a color, the resource pack setting, or something that reskins the game's interfaces
+		style.onConfigChanged(event.getGroup(), event.getKey());
+
 		// Favoriting, recoloring or changing a setup's icon rewrites its saved json without a setups-changed message
 		// and neither does anything done to a section
 		final boolean setupEdited = SetupRepository.CONFIG_GROUP.equals(event.getGroup())
@@ -213,6 +219,7 @@ public class SetupPickerPlugin extends Plugin
 	@Subscribe
 	public void onProfileChanged(ProfileChanged event)
 	{
+		style.invalidate();
 		clientThread.invokeLater(recentTagTracker::reset);
 		queueRefresh();
 	}

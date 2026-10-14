@@ -28,24 +28,27 @@ public class SetupPickerOverlay extends Overlay
 	private final SetupPickerConfig config;
 	private final PickerModel model;
 	private final SetupIcons icons;
+	private final PickerStyle style;
 
 	// Layout of the last rendered frame, read by the input listeners. Null while the picker isn't showing.
 	private volatile PickerLayout layout;
 	private volatile String status = "";
 	private volatile Point mouse;
 	// Where the bank and the canvas were in the last rendered frame that had the list beside the bank
-	private volatile Point bankCorner;
+	private volatile Rectangle bankBounds;
 	private volatile Rectangle canvas;
 	// While the list beside the bank is being dragged: where its corner is from the bank's. Else null.
 	private volatile Point dragOffset;
 
 	@Inject
-	SetupPickerOverlay(Client client, SetupPickerConfig config, PickerModel model, ItemManager itemManager)
+	SetupPickerOverlay(Client client, SetupPickerConfig config, PickerModel model, ItemManager itemManager,
+		PickerStyle style)
 	{
 		this.client = client;
 		this.config = config;
 		this.model = model;
 		this.icons = new SetupIcons(itemManager);
+		this.style = style;
 		// Positions itself, in canvas coordinates
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
@@ -76,10 +79,11 @@ public class SetupPickerOverlay extends Overlay
 	 */
 	public void dragTo(Point corner)
 	{
-		final Point bank = bankCorner;
+		final Rectangle bank = bankBounds;
 		if (bank != null)
 		{
-			dragOffset = new Point(corner.x - bank.x, corner.y - bank.y);
+			// kept as the place without a frame, which is what is saved
+			dragOffset = PickerLayout.offsetFor(bank, corner, config.width(), frame());
 		}
 	}
 
@@ -90,14 +94,24 @@ public class SetupPickerOverlay extends Overlay
 	public Point getDragOffset()
 	{
 		final Point offset = dragOffset;
-		final Point bank = bankCorner;
+		final Rectangle bank = bankBounds;
 		final Rectangle area = canvas;
 		if (offset == null || bank == null || area == null)
 		{
 			return null;
 		}
-		final Point corner = PickerLayout.clamp(new Point(bank.x + offset.x, bank.y + offset.y), config.width(), area);
-		return new Point(corner.x - bank.x, corner.y - bank.y);
+		final PickerLayout.Frame frame = frame();
+		final Point corner = PickerLayout.movedCorner(bank, area, offset, config.width(), frame);
+		return PickerLayout.offsetFor(bank, corner, config.width(), frame);
+	}
+
+	/**
+	 * What the list was last drawn with.
+	 */
+	private PickerLayout.Frame frame()
+	{
+		final PickerLayout drawn = layout;
+		return drawn != null ? drawn.getFrame() : PickerLayout.Frame.FLAT;
 	}
 
 	/**
@@ -120,6 +134,8 @@ public class SetupPickerOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
+		style.refresh();
+		final PickerLayout.Frame frame = style.getFrame();
 		final PickerModel.View view = model.view();
 		final int rowHeight = config.showIcons() ? PickerLayout.ROW_HEIGHT_ICONS : PickerLayout.ROW_HEIGHT_TEXT;
 		final PickerLayout newLayout;
@@ -128,7 +144,7 @@ public class SetupPickerOverlay extends Overlay
 		if (view.isPaletteOpen())
 		{
 			newLayout = PickerLayout.computePalette(new Rectangle(client.getCanvasWidth(), client.getCanvasHeight()),
-				PALETTE_WIDTH, view.getRows().size(), rowHeight, config.popupRows());
+				PALETTE_WIDTH, view.getRows().size(), rowHeight, config.popupRows(), frame);
 		}
 		else
 		{
@@ -144,15 +160,15 @@ public class SetupPickerOverlay extends Overlay
 			if (offset != null)
 			{
 				newLayout = PickerLayout.computeMoved(bank.getBounds(), area, offset, config.width(), config.collapsed(),
-					view.getRows().size(), rowHeight, config.bankRows());
+					view.getRows().size(), rowHeight, config.bankRows(), frame);
 			}
 			else
 			{
 				newLayout = PickerLayout.compute(bank.getBounds(), area.width,
 					config.side() == SetupPickerConfig.Side.LEFT, config.width(), config.collapsed(), config.verticalWhenCollapsed(),
-					view.getRows().size(), rowHeight, config.bankRows());
+					view.getRows().size(), rowHeight, config.bankRows(), frame);
 			}
-			bankCorner = bank.getBounds().getLocation();
+			bankBounds = bank.getBounds();
 			canvas = area;
 			// away from the bank, rather than over it
 			notesOnLeft = newLayout.getBounds().x < bank.getBounds().x;
@@ -166,10 +182,8 @@ public class SetupPickerOverlay extends Overlay
 		final net.runelite.api.Point seen = client.getMouseCanvasPosition();
 		// unless the picker has since moved out from under it
 		final Point hover = hidden != null && newLayout.getBounds().contains(hidden) ? hidden : (seen == null ? null : new Point(seen.getX(), seen.getY()));
-		final PickerTheme theme = new PickerTheme(config.backgroundColor(), config.headerColor(), config.borderColor(),
-			config.accentColor(), config.textColor());
 		final String title = config.source() == SetupPickerConfig.Source.BANK_TAGS ? "Bank tags" : "Setups";
-		final PickerPainter painter = new PickerPainter(theme, title);
+		final PickerPainter painter = new PickerPainter(style.getTheme(), title, style.getSkin());
 		final PickerModel.View clamped = model.view();
 		painter.paint(graphics, newLayout, clamped,
 			hover,

@@ -113,6 +113,7 @@ public final class PickerPainter
 
 	private final PickerTheme theme;
 	private final String title;
+	private final PickerSkin skin;
 
 	public PickerPainter(PickerTheme theme)
 	{
@@ -124,8 +125,18 @@ public final class PickerPainter
 	 */
 	public PickerPainter(PickerTheme theme, String title)
 	{
+		this(theme, title, null);
+	}
+
+	/**
+	 * @param skin the game's sprites to draw the frame, search box and scrollbar with, laid out for
+	 *             {@link PickerLayout.Frame#GAME}, or null to draw them in the theme's colors
+	 */
+	public PickerPainter(PickerTheme theme, String title, PickerSkin skin)
+	{
 		this.theme = theme;
 		this.title = title;
+		this.skin = skin;
 	}
 
 	/**
@@ -142,8 +153,15 @@ public final class PickerPainter
 		final FontMetrics fm = g.getFontMetrics();
 
 		final Rectangle bounds = layout.getBounds();
-		g.setColor(theme.getBackground());
-		g.fill(bounds);
+		if (skin != null)
+		{
+			skin.paintFrame(g, bounds, layout.getDivider());
+		}
+		else
+		{
+			g.setColor(theme.getBackground());
+			g.fill(bounds);
+		}
 
 		paintHeader(g, fm, layout, view, mouse);
 
@@ -161,6 +179,14 @@ public final class PickerPainter
 				layout.getFooter().width - 8), layout.getFooter().x + 4, baseline(fm, layout.getFooter()), theme.getMutedText());
 		}
 
+		if (skin == null)
+		{
+			paintBorder(g, bounds);
+		}
+	}
+
+	private void paintBorder(Graphics2D g, Rectangle bounds)
+	{
 		g.setColor(theme.getBorder());
 		g.drawRect(bounds.x + 1, bounds.y + 1, bounds.width - 3, bounds.height - 3);
 		g.setColor(BORDER_OUTER);
@@ -169,10 +195,14 @@ public final class PickerPainter
 
 	private void paintHeader(Graphics2D g, FontMetrics fm, PickerLayout layout, PickerModel.View view, Point mouse)
 	{
-		final Rectangle header = layout.getHeader();
-		g.setColor(theme.getHeader());
-		g.fill(header);
-		final boolean hovered = !layout.isPalette() && mouse != null && header.contains(mouse);
+		final Rectangle header = layout.getTitle();
+		// on the game's backing the title sits straight on the background, as the bank's does
+		if (skin == null)
+		{
+			g.setColor(theme.getHeader());
+			g.fill(header);
+		}
+		final boolean hovered = !layout.isPalette() && mouse != null && layout.getHeader().contains(mouse);
 		if (hovered)
 		{
 			g.setColor(ROW_HOVER);
@@ -230,13 +260,22 @@ public final class PickerPainter
 
 	private void paintSearch(Graphics2D g, FontMetrics fm, Rectangle search, PickerModel.View view)
 	{
-		g.setColor(FIELD_BACKGROUND);
-		g.fill(search);
-		g.setColor(view.isSearchFocused() ? theme.getAccent() : theme.getBorder());
-		g.drawRect(search.x, search.y, search.width - 1, search.height - 1);
+		if (skin != null)
+		{
+			skin.paintField(g, search, view.isSearchFocused());
+		}
+		else
+		{
+			g.setColor(FIELD_BACKGROUND);
+			g.fill(search);
+			g.setColor(view.isSearchFocused() ? theme.getAccent() : theme.getBorder());
+			g.drawRect(search.x, search.y, search.width - 1, search.height - 1);
+		}
 
-		final int textX = search.x + 5;
-		final int maxWidth = search.width - 10;
+		// clear of the stone outline's bevelled corners, with the game's sprites
+		final int inset = skin != null ? 8 : 5;
+		final int textX = search.x + inset;
+		final int maxWidth = search.width - 2 * inset;
 		if (view.getQuery().isEmpty() && !view.isSearchFocused())
 		{
 			text(g, "Search...", textX, baseline(fm, search), theme.getMutedText());
@@ -364,7 +403,12 @@ public final class PickerPainter
 			text(g, truncate(fm, setup.getName(), textRight - textX), textX, baseline(fm, row), color);
 		}
 
-		if (scrollbar != null)
+		if (scrollbar != null && skin != null)
+		{
+			skin.paintScrollbar(g, layout.getScrollTrack(rows.size()), layout.getScrollThumb(rows.size(), view.getScroll()),
+				layout.getScrollUp(rows.size()), layout.getScrollDown(rows.size()));
+		}
+		else if (scrollbar != null)
 		{
 			g.setColor(SCROLLBAR_TRACK);
 			g.fill(scrollbar);
@@ -527,30 +571,39 @@ public final class PickerPainter
 		final Rectangle bounds = layout.getBounds();
 		final int leftRoom = bounds.x - canvas.x;
 		final int rightRoom = canvas.x + canvas.width - bounds.x - bounds.width;
-		final boolean left = leftRoom >= NOTES_WIDTH && (preferLeft || rightRoom < NOTES_WIDTH)
+		// clear of the game's thicker frame too, which goes round the room the text has rather than taking from it
+		final int padding = Math.max(NOTES_PADDING, layout.getFrame().edge + 4);
+		final int boxWidth = NOTES_WIDTH + 2 * (padding - NOTES_PADDING);
+		final boolean left = leftRoom >= boxWidth && (preferLeft || rightRoom < boxWidth)
 			// too narrow a canvas for it either way: whichever side has more of it
-			|| rightRoom < NOTES_WIDTH && leftRoom > rightRoom;
-		final int width = Math.max(4 * NOTES_PADDING, Math.min(NOTES_WIDTH, left ? leftRoom : rightRoom));
-		final List<String> lines = wrap(fm, setup.getNotes(), width - 2 * NOTES_PADDING, NOTES_MAX_LINES);
-		final int height = lines.size() * fm.getHeight() + 2 * NOTES_PADDING;
+			|| rightRoom < boxWidth && leftRoom > rightRoom;
+		final int width = Math.max(4 * padding, Math.min(boxWidth, left ? leftRoom : rightRoom));
+		final List<String> lines = wrap(fm, setup.getNotes(), width - 2 * padding, NOTES_MAX_LINES);
+		final int height = lines.size() * fm.getHeight() + 2 * padding;
 
-		// sharing the picker's edge, and starting level with the setup unless that runs off the bottom
+		// sharing the picker's edge, or against the game's frame, and starting level with the setup unless that runs
+		// off the bottom
 		final int row = index - view.getScroll();
 		final int level = row >= 0 && row < layout.getVisibleRows() ? layout.getRow(row).y : layout.getList().y;
 		final int y = Math.max(canvas.y, Math.min(level, canvas.y + canvas.height - height));
-		final Rectangle box = new Rectangle(left ? bounds.x - width + 1 : bounds.x + bounds.width - 1, y, width, height);
+		final int overlap = skin == null ? 1 : 0;
+		final Rectangle box = new Rectangle(left ? bounds.x - width + overlap : bounds.x + bounds.width - overlap, y, width, height);
 
-		g.setColor(theme.getBackground());
-		g.fill(box);
-		g.setColor(theme.getBorder());
-		g.drawRect(box.x + 1, box.y + 1, box.width - 3, box.height - 3);
-		g.setColor(BORDER_OUTER);
-		g.drawRect(box.x, box.y, box.width - 1, box.height - 1);
+		if (skin != null)
+		{
+			skin.paintFrame(g, box, 0);
+		}
+		else
+		{
+			g.setColor(theme.getBackground());
+			g.fill(box);
+			paintBorder(g, box);
+		}
 
-		int baseline = box.y + NOTES_PADDING + fm.getAscent();
+		int baseline = box.y + padding + fm.getAscent();
 		for (String line : lines)
 		{
-			text(g, line, box.x + NOTES_PADDING, baseline, theme.getText());
+			text(g, line, box.x + padding, baseline, theme.getText());
 			baseline += fm.getHeight();
 		}
 	}

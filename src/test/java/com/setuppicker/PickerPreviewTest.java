@@ -1,6 +1,7 @@
 package com.setuppicker;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
@@ -13,11 +14,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.IntFunction;
 import javax.imageio.ImageIO;
+import net.runelite.api.gameval.SpriteID;
 import net.runelite.client.ui.FontManager;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
@@ -184,6 +187,316 @@ public class PickerPreviewTest
 		final File out = new File("build/preview-mixed.png");
 		out.getParentFile().mkdirs();
 		ImageIO.write(image, "png", out);
+	}
+
+	// The frame's corners and the stone outlines', each top left, top right, bottom left and bottom right
+	private static final int[][] CORNERS = {
+		{SpriteID.Steelborder.TOP_LEFT, SpriteID.Steelborder.TOP_RIGHT, SpriteID.Steelborder.BOTTOM_LEFT, SpriteID.Steelborder.BOTTOM_RIGHT},
+		{SpriteID.V2StoneButton.TOP_LEFT, SpriteID.V2StoneButton.TOP_RIGHT, SpriteID.V2StoneButton.BOTTOM_LEFT, SpriteID.V2StoneButton.BOTTOM_RIGHT},
+		{SpriteID.V2StoneButtonIn.A_TOP_LEFT, SpriteID.V2StoneButtonIn.A_TOP_RIGHT, SpriteID.V2StoneButtonIn.A_BOTTOM_LEFT,
+			SpriteID.V2StoneButtonIn.A_BOTTOM_RIGHT},
+	};
+
+	/**
+	 * Stand-ins for the game's interface sprites, at their sizes in the cache, for checking the layout of the
+	 * game's frame. The real ones only come from the game.
+	 */
+	private static final PickerSkin.Sprites GAME_SPRITES = id ->
+	{
+		final Dimension size;
+		final Color color;
+		switch (id)
+		{
+			case SpriteID.TRADEBACKING:
+			case SpriteID.TRADEBACKING_DARK:
+				size = new Dimension(88, 60);
+				color = id == SpriteID.TRADEBACKING ? new Color(72, 62, 51) : new Color(52, 44, 35);
+				break;
+			case SpriteID.Steelborder.TOP_LEFT:
+			case SpriteID.Steelborder.TOP_RIGHT:
+			case SpriteID.Steelborder.BOTTOM_LEFT:
+			case SpriteID.Steelborder.BOTTOM_RIGHT:
+				size = new Dimension(25, 30);
+				color = new Color(30, 30, 28);
+				break;
+			case SpriteID.Steelborder2.EDGE_RIGHT:
+			case SpriteID.Miscgraphics.IRON_RIVETS_VERTICAL:
+				size = new Dimension(6, 36);
+				color = new Color(45, 45, 42);
+				break;
+			case SpriteID.Steelborder2.EDGE_TOP:
+			case SpriteID.Miscgraphics.IRON_RIVETS_HORIZONTAL:
+			case SpriteID.SteelborderDivider._0:
+				size = new Dimension(36, 6);
+				color = new Color(45, 45, 42);
+				break;
+			case SpriteID.ScrollbarV2.ARROW_UP:
+			case SpriteID.ScrollbarV2.ARROW_DOWN:
+				size = new Dimension(16, 16);
+				color = new Color(110, 100, 80);
+				break;
+			case SpriteID.ScrollbarDraggerV2.TOP:
+			case SpriteID.ScrollbarDraggerV2.MIDDLE:
+			case SpriteID.ScrollbarDraggerV2.BOTTOM:
+			case SpriteID.ScrollbarDraggerV2.TRACK:
+				size = new Dimension(16, 5);
+				color = id == SpriteID.ScrollbarDraggerV2.TRACK ? new Color(40, 34, 26) : new Color(110, 100, 80);
+				break;
+			case SpriteID.V2StoneButton.LEFT:
+			case SpriteID.V2StoneButton.RIGHT:
+			case SpriteID.V2StoneButtonIn.A_LEFT:
+			case SpriteID.V2StoneButtonIn.A_RIGHT:
+				size = new Dimension(3, 9);
+				color = new Color(95, 88, 72);
+				break;
+			case SpriteID.V2StoneButton.TOP:
+			case SpriteID.V2StoneButton.BOTTOM:
+			case SpriteID.V2StoneButtonIn.A_TOP:
+			case SpriteID.V2StoneButtonIn.A_BOTTOM:
+				size = new Dimension(9, 3);
+				color = new Color(95, 88, 72);
+				break;
+			default:
+				// the stone outline's corners
+				size = new Dimension(9, 9);
+				color = new Color(95, 88, 72);
+		}
+		final BufferedImage sprite = new BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_ARGB);
+		final Graphics2D g = sprite.createGraphics();
+		g.setColor(color);
+		boolean corner = false;
+		for (int[] set : CORNERS)
+		{
+			for (int i = 0; i < set.length; i++)
+			{
+				if (set[i] == id)
+				{
+					// an L, as the real corners are, with see-through inside it
+					final int thickness = set == CORNERS[0] ? 6 : 3;
+					g.fillRect(i % 2 == 0 ? 0 : size.width - thickness, 0, thickness, size.height);
+					g.fillRect(0, i < 2 ? 0 : size.height - thickness, size.width, thickness);
+					corner = true;
+				}
+			}
+		}
+		if (!corner)
+		{
+			g.fillRect(0, 0, size.width, size.height);
+		}
+		g.dispose();
+		return sprite;
+	};
+
+	@Test
+	public void renderGamePreview() throws Exception
+	{
+		final BufferedImage image = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
+		final Graphics2D g = image.createGraphics();
+		g.setColor(new Color(60, 90, 60));
+		g.fillRect(0, 0, WIDTH, HEIGHT);
+
+		// The list beside the bank drawn with the game's sprites, scrolled, with notes shown for the hovered setup
+		final PickerSkin skin = new PickerSkin(GAME_SPRITES);
+		assertTrue(skin.isComplete());
+		final PickerTheme theme = new PickerTheme(skin.getBackground(), skin.getField(), new Color(0x2e2b23),
+			PickerTheme.DEFAULT_ACCENT, PickerTheme.DEFAULT_TEXT);
+		final List<SetupEntry> entries = new ArrayList<>(setups());
+		entries.set(2, new SetupEntry("Vardorvis", false, null, 3, "Bring a stamina potion"));
+		final PickerModel model = new PickerModel();
+		model.setShowNotes(true);
+		model.setSetups(entries);
+		model.setActiveSetup("Zulrah");
+		final Rectangle bank = new Rectangle(220, 60, 488, 300);
+		g.setColor(new Color(73, 64, 52));
+		g.fill(bank);
+		final PickerLayout layout = PickerLayout.compute(bank, WIDTH, true, 160, false, true,
+			model.view().getRows().size(), PickerLayout.ROW_HEIGHT_ICONS, 0, PickerLayout.Frame.GAME);
+		model.setVisibleRows(layout.getVisibleRows());
+		final Point mouse = new Point(layout.getRow(2).x + 20, layout.getRow(2).y + 5);
+		final PickerPainter painter = new PickerPainter(theme, "Setups", skin);
+		painter.paint(g, layout, model.view(), mouse, ICONS, FontManager.getRunescapeSmallFont(), "");
+		painter.paintNotes(g, layout, model.view(), mouse, FontManager.getRunescapeSmallFont(), new Rectangle(WIDTH, HEIGHT), true);
+		g.dispose();
+
+		// the frame's background shows inside it, and the bank is left alone
+		assertEquals(skin.getBackground().getRGB(), image.getRGB(layout.getTitle().x + layout.getTitle().width - 30, layout.getTitle().y + 1));
+		assertEquals(new Color(73, 64, 52).getRGB(), image.getRGB(bank.x + 5, bank.y + 5));
+		final File out = new File("build/preview-game.png");
+		out.getParentFile().mkdirs();
+		ImageIO.write(image, "png", out);
+	}
+
+	@Test
+	public void gameFrameMakesRoomForItself()
+	{
+		final Rectangle bank = new Rectangle(220, 60, 488, 300);
+		final PickerLayout flat = PickerLayout.compute(bank, WIDTH, true, 160, false, true, 30, 20, 5);
+		final PickerLayout game = PickerLayout.compute(bank, WIDTH, true, 160, false, true, 30, 20, 5, PickerLayout.Frame.GAME);
+		// the frame goes round what's inside, which is as wide as in colors, and the list is still beside the bank
+		assertEquals(flat.getBounds().width + 2 * 6, game.getBounds().width);
+		assertEquals(flat.getList().width, game.getList().width);
+		assertEquals(flat.getSearch().width, game.getSearch().width);
+		assertEquals(flat.getTitle().width, game.getTitle().width);
+		assertEquals(bank.x - PickerLayout.GAP, game.getBounds().x + game.getBounds().width);
+		assertEquals(game.getBounds().x + 6 + PickerLayout.PADDING, game.getList().x);
+		assertEquals(flat.getBounds().height + 3 * 6, game.getBounds().height);
+		assertEquals(game.getTitle().y + game.getTitle().height - game.getBounds().y, game.getDivider());
+		assertTrue(game.getHeader().contains(game.getTitle()));
+		// flat, the title bar is all of what can be taken hold of
+		assertEquals(flat.getHeader(), flat.getTitle());
+		assertEquals(0, flat.getDivider());
+
+		// the game's scrollbar has its arrows, and its thumb runs between them
+		final Rectangle bar = game.getScrollbar(30);
+		final Rectangle up = game.getScrollUp(30);
+		final Rectangle down = game.getScrollDown(30);
+		final Rectangle track = game.getScrollTrack(30);
+		assertEquals(16, bar.width);
+		assertEquals(bar.y, up.y);
+		assertEquals(up.y + up.height, track.y);
+		assertEquals(down.y, track.y + track.height);
+		assertEquals(bar.y + bar.height, down.y + down.height);
+		for (int scroll = 0; scroll <= 25; scroll++)
+		{
+			final Rectangle thumb = game.getScrollThumb(30, scroll);
+			assertTrue(track.contains(thumb));
+			assertEquals(scroll, game.scrollAt(30, thumb.y));
+		}
+		// the flat one has none, nor has one too short for them
+		assertNull(flat.getScrollUp(30));
+		assertEquals(flat.getScrollbar(30), flat.getScrollTrack(30));
+		final PickerLayout small = PickerLayout.compute(bank, WIDTH, true, 160, false, true, 30, 20, 2, PickerLayout.Frame.GAME);
+		assertNull(small.getScrollDown(30));
+		assertEquals(small.getScrollbar(30), small.getScrollTrack(30));
+
+		// collapsed, it is its title bar in the frame, or an upright tab as wide as the title bar is tall
+		final PickerLayout collapsed = PickerLayout.compute(bank, WIDTH, true, 160, true, false, 30, 20, 0, PickerLayout.Frame.GAME);
+		assertEquals(PickerLayout.HEADER_HEIGHT + 12, collapsed.getBounds().height);
+		assertEquals(collapsed.getBounds(), collapsed.getHeader());
+		assertFalse(collapsed.isUprightTab());
+		final PickerLayout tab = PickerLayout.compute(bank, WIDTH, true, 160, true, true, 30, 20, 0, PickerLayout.Frame.GAME);
+		assertTrue(tab.isUprightTab());
+		assertEquals(PickerLayout.COLLAPSED_WIDTH, tab.getTitle().width);
+		assertEquals(bank.x - PickerLayout.GAP, tab.getBounds().x + tab.getBounds().width);
+
+		// with no room either side, it sits over the bank's edge, frame and all
+		final Rectangle fixed = new Rectangle(12, 2, 488, 334);
+		final PickerLayout over = PickerLayout.compute(fixed, 512, true, 160, false, true, 30, 20, 0, PickerLayout.Frame.GAME);
+		assertEquals(fixed.x, over.getBounds().x);
+		assertEquals(172, over.getBounds().width);
+		final PickerLayout overRight = PickerLayout.compute(fixed, 512, false, 160, false, true, 30, 20, 0, PickerLayout.Frame.GAME);
+		assertEquals(fixed.x + fixed.width, overRight.getBounds().x + overRight.getBounds().width);
+
+		// dragged into a corner, all of it stays on the canvas
+		final Rectangle canvas = new Rectangle(WIDTH, 500);
+		final PickerLayout cornered = PickerLayout.computeMoved(bank, canvas, new Point(900, 900), 160, true, 30, 20, 0, PickerLayout.Frame.GAME);
+		assertEquals(new Rectangle(WIDTH - 172, 500 - PickerLayout.HEADER_HEIGHT - 12, 172, PickerLayout.HEADER_HEIGHT + 12), cornered.getBounds());
+		assertEquals(new Point(WIDTH - 172, 0), PickerLayout.clamp(new Point(900, -50), 160, canvas, PickerLayout.Frame.GAME));
+		// and with a max of rows, no more than that
+		assertEquals(4, PickerLayout.computeMoved(bank, canvas, new Point(-200, 100), 160, false, 30, 20, 4, PickerLayout.Frame.GAME).getVisibleRows());
+
+		// the popup is as wide inside as in colors and centred, and on a canvas too narrow for its frame fits the canvas
+		final PickerLayout popup = PickerLayout.computePalette(new Rectangle(WIDTH, HEIGHT), 240, 30, 20, 10, PickerLayout.Frame.GAME);
+		assertEquals(PickerLayout.computePalette(new Rectangle(WIDTH, HEIGHT), 240, 30, 20, 10).getList().width, popup.getList().width);
+		assertEquals((WIDTH - 252) / 2, popup.getBounds().x);
+		final PickerLayout cramped = PickerLayout.computePalette(new Rectangle(245, 200), 240, 30, 20, 10, PickerLayout.Frame.GAME);
+		assertEquals(0, cramped.getBounds().x);
+		assertEquals(245, cramped.getBounds().width);
+		assertTrue(cramped.getBounds().y + cramped.getBounds().height <= 200);
+	}
+
+	@Test
+	public void frameGrowsAwayFromTheBank()
+	{
+		final Rectangle canvas = new Rectangle(WIDTH, 500);
+		final Rectangle bank = new Rectangle(220, 60, 488, 300);
+		final PickerLayout.Frame game = PickerLayout.Frame.GAME;
+
+		// dragged left of the bank with a gap: the edge facing the bank stays, and the frame goes on the left
+		final Point left = new Point(-180, 40);
+		final Rectangle flatLeft = PickerLayout.computeMoved(bank, canvas, left, 160, false, 30, 20, 0).getBounds();
+		final Rectangle gameLeft = PickerLayout.computeMoved(bank, canvas, left, 160, false, 30, 20, 0, game).getBounds();
+		assertEquals(flatLeft.x + flatLeft.width, gameLeft.x + gameLeft.width);
+		assertEquals(flatLeft.x - 12, gameLeft.x);
+		assertEquals(flatLeft.y, gameLeft.y);
+
+		// dragged right of it: the left edge stays, and the frame goes on the right
+		final Point right = new Point(bank.width + 10, 40);
+		final Rectangle wide = new Rectangle(1000, 500);
+		final Rectangle flatRight = PickerLayout.computeMoved(bank, wide, right, 160, false, 30, 20, 0).getBounds();
+		final Rectangle gameRight = PickerLayout.computeMoved(bank, wide, right, 160, false, 30, 20, 0, game).getBounds();
+		assertEquals(flatRight.x, gameRight.x);
+		assertEquals(flatRight.x + flatRight.width + 12, gameRight.x + gameRight.width);
+
+		// collapsed, the same
+		final Rectangle barLeft = PickerLayout.computeMoved(bank, canvas, left, 160, true, 30, 20, 0, game).getBounds();
+		assertEquals(flatLeft.x + flatLeft.width, barLeft.x + barLeft.width);
+		final Rectangle barRight = PickerLayout.computeMoved(bank, wide, right, 160, true, 30, 20, 0, game).getBounds();
+		assertEquals(flatRight.x, barRight.x);
+
+		// the place saved is the same with the frame or without, so turning it on and off comes back to the same spot
+		for (Point offset : Arrays.asList(left, right))
+		{
+			for (PickerLayout.Frame frame : Arrays.asList(PickerLayout.Frame.FLAT, game))
+			{
+				final Point corner = PickerLayout.movedCorner(bank, wide, offset, 160, frame);
+				assertEquals(offset, PickerLayout.offsetFor(bank, corner, 160, frame));
+			}
+		}
+
+		// and it is still kept on the canvas
+		assertEquals(0, PickerLayout.computeMoved(bank, canvas, new Point(-215, 40), 160, false, 30, 20, 0, game).getBounds().x);
+
+		// beside the bank, the gap stays on either side, expanded, collapsed or as an upright tab
+		for (boolean collapsed : new boolean[]{false, true})
+		{
+			for (boolean upright : new boolean[]{false, true})
+			{
+				final Rectangle beside = PickerLayout.compute(bank, WIDTH, true, 160, collapsed, upright, 30, 20, 0, game).getBounds();
+				assertEquals(bank.x - PickerLayout.GAP, beside.x + beside.width);
+				final Rectangle other = PickerLayout.compute(bank, 1000, false, 160, collapsed, upright, 30, 20, 0, game).getBounds();
+				assertEquals(bank.x + bank.width + PickerLayout.GAP, other.x);
+			}
+		}
+	}
+
+	@Test
+	public void spritesAreTrimmedToWhatShows()
+	{
+		// an edge as the cache keeps it, a strip within a larger box
+		final BufferedImage box = new BufferedImage(36, 36, BufferedImage.TYPE_INT_ARGB);
+		final Graphics2D g = box.createGraphics();
+		g.setColor(Color.GRAY);
+		g.fillRect(0, 15, 36, 6);
+		g.dispose();
+		final BufferedImage strip = PickerSkin.trim(box);
+		assertEquals(36, strip.getWidth());
+		assertEquals(6, strip.getHeight());
+		assertEquals(Color.GRAY.getRGB(), strip.getRGB(0, 0));
+		// one with nothing to show isn't missing: a pack can leave a sprite blank on purpose
+		assertSame(PickerSkin.EMPTY, PickerSkin.trim(new BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB)));
+	}
+
+	@Test
+	public void blankSpritesDrawNothing()
+	{
+		// a pack with no scrollbar track and a see-through background, as duckscape's and others are
+		final PickerSkin skin = new PickerSkin(id -> id == SpriteID.ScrollbarDraggerV2.TRACK || id == SpriteID.TRADEBACKING
+			? PickerSkin.EMPTY : GAME_SPRITES.get(id));
+		assertTrue(skin.isComplete());
+		// the background's color falls back to the theme's rather than coming from no pixels at all
+		assertEquals(PickerTheme.DEFAULT_BACKGROUND, skin.getBackground());
+
+		final BufferedImage image = new BufferedImage(200, 300, BufferedImage.TYPE_INT_ARGB);
+		final Graphics2D g = image.createGraphics();
+		final PickerLayout layout = PickerLayout.computePalette(new Rectangle(200, 300), 160, 30, 20, 8, PickerLayout.Frame.GAME);
+		skin.paintFrame(g, layout.getBounds(), layout.getDivider());
+		final Rectangle track = layout.getScrollTrack(30);
+		skin.paintScrollbar(g, track, layout.getScrollThumb(30, 22), layout.getScrollUp(30), layout.getScrollDown(30));
+		g.dispose();
+		// nothing behind the frame's middle, nor in the track above the thumb at the bottom
+		assertEquals(0, image.getRGB(layout.getList().x + 20, layout.getList().y + 20));
+		assertEquals(0, image.getRGB(track.x + 4, track.y + 4));
 	}
 
 	@Test

@@ -103,7 +103,7 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 				titlePress = e.getPoint();
 				// from where the title bar's corner is, which for a list collapsed to an upright tab is the tab's
 				titleGrab = new Point(e.getX() - layout.getBounds().x,
-					Math.min(e.getY() - layout.getBounds().y, PickerLayout.HEADER_HEIGHT - 1));
+					Math.min(e.getY() - layout.getBounds().y, layout.getTitle().y - layout.getBounds().y + PickerLayout.HEADER_HEIGHT - 1));
 				titleCollapsed = layout.isCollapsed();
 			}
 			else if (layout.getSearch() != null && layout.getSearch().contains(e.getPoint()))
@@ -146,7 +146,7 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 
 	/**
 	 * Take hold of the scrollbar if that's what was pressed. Pressing it above or below its thumb brings the
-	 * thumb there first.
+	 * thumb there first. Its arrows, when it has them, scroll a row.
 	 */
 	private boolean grabScrollbar(PickerLayout layout, MouseEvent e)
 	{
@@ -156,6 +156,13 @@ public class PickerInput extends MouseAdapter implements KeyListener, MouseWheel
 		if (bar == null || !bar.contains(e.getPoint()))
 		{
 			return false;
+		}
+		final Rectangle up = layout.getScrollUp(rowCount);
+		final Rectangle down = layout.getScrollDown(rowCount);
+		if (up != null && up.contains(e.getPoint()) || down != null && down.contains(e.getPoint()))
+		{
+			model.scrollBy(up != null && up.contains(e.getPoint()) ? -1 : 1);
+			return true;
 		}
 		final Rectangle thumb = layout.getScrollThumb(rowCount, view.getScroll());
 		scrollGrab = thumb.contains(e.getPoint()) ? e.getY() - thumb.y : thumb.height / 2;

@@ -312,13 +312,27 @@ public interface SetupPickerConfig extends Config
 	)
 	String colorSection = "colors";
 
+	@ConfigItem(
+		keyName = "matchResourcePack",
+		name = "Match resource pack",
+		description = "Draw the lists' background, frame, search box and scrollbar with the game's own interface sprites,"
+			+ " so that they follow your resource pack or interface style. The background, title bar and border colors"
+			+ " below are then not used.",
+		section = colorSection,
+		position = 0
+	)
+	default boolean matchResourcePack()
+	{
+		return false;
+	}
+
 	@Alpha
 	@ConfigItem(
 		keyName = "backgroundColor",
 		name = "Background",
 		description = "Background of the list",
 		section = colorSection,
-		position = 0
+		position = 1
 	)
 	default Color backgroundColor()
 	{
@@ -330,7 +344,7 @@ public interface SetupPickerConfig extends Config
 		name = "Title bar",
 		description = "Background of the title bar",
 		section = colorSection,
-		position = 1
+		position = 2
 	)
 	default Color headerColor()
 	{
@@ -342,7 +356,7 @@ public interface SetupPickerConfig extends Config
 		name = "Border",
 		description = "The frame, the search box outline and section dividers",
 		section = colorSection,
-		position = 2
+		position = 3
 	)
 	default Color borderColor()
 	{
@@ -354,7 +368,7 @@ public interface SetupPickerConfig extends Config
 		name = "Accent",
 		description = "The title, the keyboard selection, the focused search box and the open setup",
 		section = colorSection,
-		position = 3
+		position = 4
 	)
 	default Color accentColor()
 	{
@@ -366,7 +380,7 @@ public interface SetupPickerConfig extends Config
 		name = "Text",
 		description = "Setup names that have no color of their own in Inventory Setups",
 		section = colorSection,
-		position = 4
+		position = 5
 	)
 	default Color textColor()
 	{

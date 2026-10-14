@@ -39,16 +39,18 @@ public class SpellbookOverlay extends Overlay
 	private final Client client;
 	private final SetupPickerConfig config;
 	private final PickerModel model;
+	private final PickerStyle style;
 
 	// Each setup's spellbook by its name, for the ones that have one
 	private volatile Map<String, Integer> spellbooks = Collections.emptyMap();
 
 	@Inject
-	SpellbookOverlay(Client client, SetupPickerConfig config, PickerModel model)
+	SpellbookOverlay(Client client, SetupPickerConfig config, PickerModel model, PickerStyle style)
 	{
 		this.client = client;
 		this.config = config;
 		this.model = model;
+		this.style = style;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
 	}
@@ -115,9 +117,11 @@ public class SpellbookOverlay extends Overlay
 		}
 
 		// the picker's own background, toned down, so that the text can be read over whatever is behind it
-		graphics.setColor(muted(config.backgroundColor()));
+		style.refresh();
+		final PickerTheme theme = style.getTheme();
+		graphics.setColor(muted(theme.getBackground()));
 		graphics.fill(box);
-		graphics.setColor(muted(config.borderColor()));
+		graphics.setColor(muted(theme.getBorder()));
 		graphics.drawRect(box.x, box.y, box.width - 1, box.height - 1);
 
 		final int x = box.x + PADDING_X;
